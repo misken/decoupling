@@ -29,9 +29,9 @@ library(ggplot2)
 
 ## Creating the dataset
 
-In the decoupling conversation, GDP is generally used as the measure of economic growth - one of the things that is coupled. It is the *driving variable*. GDP is tricky to measure and not necessarily a great measure of *prosperity*. For the *driven variable*, many possibilities exist but essentially it boils down to resource use or its impact (@vaden2020decoupling). So, decoupling could occur, or not occur, for any subset of potential driven variables and might involve resource use or environmental impact. It also may be temporary or permanent. It's magnitude may be sufficient to avert some pretty bad outcomes or it may not be. Decoupling might be local, regional or global. Of course, the earth probably isn't interested in local decoupling unless the ideas underpinning it lead to global decoupling.
+In the decoupling conversation, GDP is generally used as the measure of economic growth - one of the things that is coupled. It is the *driving variable*. GDP is tricky to measure and not necessarily a great measure of *prosperity*. For the *driven variable*, many possibilities exist but essentially it boils down to resource use or its impact (@vaden2020decoupling). So, decoupling could occur, or not occur, for any subset of potential driven variables and might involve resource use or environmental impact. It also may be temporary or permanent. Its magnitude may be sufficient to avert some pretty bad outcomes or it may not be. Decoupling might be local, regional or global. Of course, the earth probably isn't interested in local decoupling unless the ideas underpinning it lead to global decoupling.
 
-I created two dataframes, one at the country level and one at the global level containing a range of variables that would seem to be relevant and for which data was generally available from 1980 until the near present. Data acquisition and processing scripts were written using R and can be found in the `data_prep.qmd` file in the [GitHub repository for this post](). The variables included in the global dataframe include:
+I created two dataframes, one at the country level and one at the global level containing a range of variables that would seem to be relevant and for which data was generally available from 1980 until the near present. Data acquisition and processing scripts were written using R and can be found in the `data_prep.qmd` file in the [GitHub repository for this post](https://github.com/misken/decoupling). The variables included in the global dataframe include:
 
 * `year` - four digit year,
 - `population` - see <https://ourworldindata.org/grapher/population>,
@@ -85,20 +85,16 @@ world_metrics_df <- read.csv('data/owid/world_metrics.csv')
 summary(world_metrics_df)
 ```
 
-```{r}
-head(world_metrics_df)
-```
-
 The `country_metrics_df` dataframe has most of the same columns but is by country by year.
 
 
 ## Defining decoupling is tricky
 
-Decoupling is a complex topic. I highly recommend the following report to get a concise overview of what decoupling is and analysis of whether or not or to what degree it is happening and is likely to happen in the future.
+Decoupling is a complex topic. I highly recommend @parrique2019decoupling to get a concise overview of what decoupling is and analysis of whether or not or to what degree it is happening and is likely to happen in the future.
 
 - Parrique, Timothée, Jonathan Barth, François Briens, Christian Kerschner, Alejo Kraus-Polk, Anna Kuokkanen, and Joachim H Spangenberg. [“Decoupling Debunked.” Evidence and Arguments against Green Growth as a Sole Strategy for Sustainability](https://eeb.org/library/decoupling-debunked/). A Study Edited by the European Environment Bureau EEB 3 (2019).
 
-For this post, a couple of concepts are important. *Relative decoupling* is when the driven variable is growing slower than the driving variable (i.e. GDP). *Absolute decoupling* is when the driving variable is not growing even though the driving variable continues to grow. In the EEB study, it is argued that:
+For this post, a couple of concepts are important. *Relative decoupling* is when the driven variable is growing slower than the driving variable (i.e. GDP). *Absolute decoupling* is when the driving variable is not growing (decreasing hopefully) even though the driving variable continues to grow. In the EEB study, it is argued that:
 
 > The validity of the green growth discourse relies on the assumption of an absolute, permanent,
 global, large and fast enough decoupling of economic growth from all critical environmental
@@ -212,7 +208,7 @@ world_metrics_df |>
        title = "Primary Energy Consumption (per capita)")
   
 ```
-So, one sees a greater degree of relative decoupling in the per capita versions of these two metrics. From the earth's perspective, it doesn't really care about per capita statistics - it's the overall magnitude that matters.
+So, one sees a greater degree of relative decoupling in the per capita versions of these two metrics. From the earth's perspective, it doesn't really care so much about per capita statistics - it's the overall amount that really matters.
 
 Looking at the last few years, the slopes of the two series are more similar than in the plot starting at 1980. When looking at decoupling, the date range can matter. One might get relative (or even absolute) decoupling for a period of time, only to see that revert to more coupled behavior.
 
@@ -234,10 +230,6 @@ world_metrics_df |>
   
 ```
 
-
-
-The data from OWID is per capita. I converted them to overall values by multiplying by the population value for each year.
-
 ## Greenhouse gas emissions
 
 There was a high profile study done by the World Resources Institute in 2016 entitled [The Roads to Decoupling: 21 Countries Are Reducing Carbon Emissions While Growing GDP](https://www.wri.org/insights/roads-decoupling-21-countries-are-reducing-carbon-emissions-while-growing-gdp). 
@@ -246,10 +238,6 @@ Reading the report, it would seem the analysis was production based and not cons
 > Beyond the aggregate trends described here, more information is needed on the potential leakage of carbon emissions to other countries as nations move their industries overseas, factors that enable sustained and absolute decoupling, and what’s needed to support larger-scale emissions mitigation.
 
 Greenhouse gas emissions are measured in tonnes per person of carbon dioxide-equivalents over a 100-year timescale. See <https://ourworldindata.org/grapher/total-greenhouse-gas-emissions-per-capita> and <https://ourworldindata.org/grapher/per-capita-ghg-excl-land-use>.
-
-
-
-The data from OWID is per capita. I converted them to overall values by multiplying by the population value for each year.
 
 Let's start by looking at the whole world and just at fossil fuel emissions.
 
@@ -269,7 +257,7 @@ world_metrics_df |>
        title = "Annual GHG emissions (excluding land use)")
   
 ```
-This plot reveals relative decoupling at the global level but still we have emissions increasing. That's not terribly surprising if one keeps up with the various attempts at forging international agreements for reducing greenhouse gas emissions. There have been decades of talk with not much in terms of results. Meanwhile, [the world keeps warming](https://www.nature.com/articles/s41558-025-02246-9) the [outlook isn't great for our climate](https://www.researchgate.net/profile/Cassio-Pereira-6/publication/384759743_The_2024_state_of_the_climate_report_Perilous_times_on_planet_Earth/links/670686b9cc8c9a65638fc3ef/The-2024-state-of-the-climate-report-Perilous-times-on-planet-Earth.pdf).
+This plot reveals relative decoupling at the global level but still we have emissions increasing. That's not terribly surprising if one keeps up with the various attempts at forging international agreements for reducing greenhouse gas emissions. There have been decades of talk with not much in terms of results. Meanwhile, [the world keeps warming](https://www.nature.com/articles/s41558-025-02246-9) and the [outlook isn't great for our climate](https://www.researchgate.net/profile/Cassio-Pereira-6/publication/384759743_The_2024_state_of_the_climate_report_Perilous_times_on_planet_Earth/links/670686b9cc8c9a65638fc3ef/The-2024-state-of-the-climate-report-Perilous-times-on-planet-Earth.pdf).
 
 The last few years look like this.
 
@@ -359,7 +347,7 @@ wri_21 <- c('Austria',
 Here we need to be careful when computing the indexed values of our metrics. Notice we use a pattern that looks like this:
 
 ```
-arrange(country, year) |> 
+  arrange(country, year) |> 
   group_by(country, year) |> 
   mutate(indexed_variable = value / value[1]) |> 
   ungroup()
@@ -558,7 +546,7 @@ world_metrics_df |>
   geom_line(aes(x=year, y = value, color = metric)) +
   scale_color_manual(values = c("#6C5043FF", "#A3BAC2FF")) +
   labs(x = "Year (2020 is year 1)", y = "Multiple of year 1",
-       title = "otal fossil fuel consumption")
+       title = "Total fossil fuel consumption")
   
 ```
 
@@ -656,6 +644,7 @@ north_america_metrics_df <- country_metrics_df |>
 ```{r}
 #| fig-width: 8
 #| fig-height: 6
+#| warning: false
 north_america_metrics_df |> 
   mutate(gdp_total_idx = gdp_total / gdp_total[1],
          primary_energy_consumption_Twh_idx = primary_energy_consumption_Twh / primary_energy_consumption_Twh[1]) |> 
@@ -671,6 +660,7 @@ north_america_metrics_df |>
 ```{r}
 #| fig-width: 8
 #| fig-height: 6
+#| warning: false
 country_metrics_df |> 
   filter(country == 'United States' | country == 'Canada' | country == 'Mexico') |> 
   group_by(country) |> 
@@ -956,7 +946,9 @@ world_metrics_df |>
 
 For the ocean heat content data, it requires some careful reindexing since the original data was indexed to
 1971 - see <https://ourworldindata.org/grapher/ocean-heat-top-2000m>. This leads to negative values for some
-of the data near 1980. We can simply shift the data by adding a constant and then reindex to 1980.
+of the data near 1980. 
+
+**TODO** Need to figure out how to properly deal with the negative values.
 
 
 ```{r}
@@ -964,30 +956,27 @@ of the data near 1980. We can simply shift the data by adding a constant and the
 #| fig-height: 6
 #| warning: false
 
-shift_constant <- world_metrics_df |> 
-  select(ocean_heat_content_noaa_2000m) |> 
-  filter(ocean_heat_content_noaa_2000m < 0) |> 
-  min() |> 
-  abs() + 5
-
-
-world_metrics_df |> 
-  mutate(gdp_total_idx = gdp_total / gdp_total[1],
-         ocean_heat_content_noaa_2000m_idx = (ocean_heat_content_noaa_2000m + shift_constant) / (ocean_heat_content_noaa_2000m[1] + shift_constant)) |> 
-  select(year, gdp_total_idx, ocean_heat_content_noaa_2000m_idx) |> 
-  pivot_longer(cols = c(gdp_total_idx, ocean_heat_content_noaa_2000m_idx), names_to = 'metric', values_to = 'value') |> 
-  ggplot() +
-  geom_line(aes(x=year, y = value, color = metric)) +
-  scale_color_manual(values = c("#6C5043FF", "#A3BAC2FF")) +
-  labs(x = "Year (1980 is year 1)", y = "Multiple of year 1", 
-       title = "Ocean heat content in top 2000m")
+# shift_constant <- world_metrics_df |> 
+#   select(ocean_heat_content_noaa_2000m) |> 
+#   filter(ocean_heat_content_noaa_2000m < 0) |> 
+#   min() |> 
+#   abs() + 5
+# 
+# 
+# world_metrics_df |> 
+#   mutate(gdp_total_idx = gdp_total / gdp_total[1],
+#          ocean_heat_content_noaa_2000m_idx = (ocean_heat_content_noaa_2000m + shift_constant) / (ocean_heat_content_noaa_2000m[1] + shift_constant)) |> 
+#   select(year, gdp_total_idx, ocean_heat_content_noaa_2000m_idx) |> 
+#   pivot_longer(cols = c(gdp_total_idx, ocean_heat_content_noaa_2000m_idx), names_to = 'metric', values_to = 'value') |> 
+#   ggplot() +
+#   geom_line(aes(x=year, y = value, color = metric)) +
+#   scale_color_manual(values = c("#6C5043FF", "#A3BAC2FF")) +
+#   labs(x = "Year (1980 is year 1)", y = "Multiple of year 1", 
+#        title = "Ocean heat content in top 2000m")
   
 ```
-Ruh roh. That looks troubling.
 
-**OWID citation**
 
-> EPA based on various sources (2021) – with minor processing by Our World in Data. “IAP” [dataset]. United States Environmental Protection Agency, “Climate Change Indicators: Ocean Heat” [original data].
 
 ## Life expectancy
 
