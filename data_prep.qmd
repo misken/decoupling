@@ -1,0 +1,649 @@
+---
+title: "Data Prep"
+bibliography: "data_sources.bib"
+format:
+  html:
+    embed-resources: true
+---
+
+```{r}
+library(dplyr)
+library(jsonlite)
+```
+
+## Read data
+
+Almost all of the data is from [Our World in Data](https://ourworldindata.org/).
+
+See <https://docs.owid.io/projects/etl/api/> for details on how the API works for data from the various charts.
+
+
+
+### GDP per capita
+
+library(jsonlite)
+
+
+
+```{r}
+download_gdp_maddison = FALSE
+
+if (download_gdp_maddison){
+  # Fetch the data
+  df <- read.csv("https://ourworldindata.org/grapher/gdp-per-capita-maddison.csv?v=1&csvType=full&useColumnShortNames=true")
+  
+  # Fetch the metadata
+  metadata <- fromJSON("https://ourworldindata.org/grapher/gdp-per-capita-maddison.metadata.json?v=1&csvType=full&useColumnShortNames=true")
+  
+  # Write out csv and json file for local use
+  write.csv(df, file = 'data/gdp-per-capita-maddison/gdp-per-capita-maddison.csv', row.names = FALSE)
+  write_json(metadata, 'data/gdp-per-capita-maddison/gdp-per-capita-maddison.metadata.json')
+  rm(df, metadata)
+}
+```
+
+Read in local version.
+
+```{r}
+gdp_maddison <- read.csv('data/gdp-per-capita-maddison/gdp-per-capita-maddison.csv')
+gdp_maddison <- gdp_maddison %>% 
+  select(1:4)
+```
+
+### Population 
+
+Data from <https://ourworldindata.org/grapher/population>. 
+
+See @owid-population-sources as well.
+
+```{r}
+download_population = FALSE
+
+if (download_population){
+  # Fetch the data
+  df <- read.csv("https://ourworldindata.org/grapher/population.csv?v=1&csvType=full&useColumnShortNames=true")
+
+  # Fetch the metadata
+    metadata <- fromJSON("https://ourworldindata.org/grapher/population.metadata.json?v=1&csvType=full&useColumnShortNames=true")
+  
+  # Write out csv and json file for local use
+  write.csv(df, file = 'data/population/population.csv', row.names = FALSE)
+  write_json(metadata, 'data/population/population.metadata.json')
+  rm(df, metadata)
+}
+```
+
+Read in local version.
+
+```{r}
+population <- read.csv('data/population/population.csv')
+names(population)[4] <- 'population'
+```
+
+### Energy use per person (kWh)
+
+From <https://ourworldindata.org/grapher/per-capita-energy-use>.
+
+Units are kilowatt-hours.
+
+```{r}
+download_energy_use_per_capita = FALSE
+
+if (download_energy_use_per_capita){
+  # Fetch the data
+  df <- read.csv("https://ourworldindata.org/grapher/per-capita-energy-use.csv?v=1&csvType=full&useColumnShortNames=true")
+  
+  # Fetch the metadata
+  metadata <- fromJSON("https://ourworldindata.org/grapher/per-capita-energy-use.metadata.json?v=1&csvType=full&useColumnShortNames=true")
+  
+  # Write out csv and json file for local use
+  write.csv(df, file = 'data/per-capita-energy-use/per-capita-energy-use.csv', row.names = FALSE)
+  write_json(metadata, 'data/per-capita-energy-use/per-capita-energy-use.metadata.json')
+ rm(df, metadata) 
+}
+
+
+```
+
+Read in local version.
+
+```{r}
+energy_per_person <- read.csv('data/per-capita-energy-use/per-capita-energy-use.csv')
+
+```
+
+### Total greenhouse gas emissions including land use
+
+Greenhouse gas emissions are measured in tonnes per person of carbon dioxide-equivalents over a 100-year timescale. See <https://ourworldindata.org/grapher/total-greenhouse-gas-emissions-per-capita>.
+
+```{r}
+download_gg_emissions = FALSE
+
+if (download_gg_emissions){
+
+  # Fetch the data
+  df <- read.csv("https://ourworldindata.org/grapher/total-greenhouse-gas-emissions-per-capita.csv?v=1&csvType=full&useColumnShortNames=true")
+  
+  # Fetch the metadata
+  metadata <- fromJSON("https://ourworldindata.org/grapher/total-greenhouse-gas-emissions-per-capita.metadata.json?v=1&csvType=full&useColumnShortNames=true")
+  
+  # Write out csv and json file for local use
+  write.csv(df, file = 'data/total-greenhouse-gas-emissions-per-capita/total-greenhouse-gas-emissions-per-capita.csv', row.names = FALSE)
+  write_json(metadata, 'data/total-greenhouse-gas-emissions-per-capita/total-greenhouse-gas-emissions-per-capita.json')
+  rm(df, metadata)
+}
+
+
+```
+
+Read in local version.
+
+```{r}
+gg_emissions_per_person_inc_land_use <- read.csv('data/total-greenhouse-gas-emissions-per-capita/total-greenhouse-gas-emissions-per-capita.csv')
+
+```
+
+Now do the version that excludes land use and forestry. See <https://ourworldindata.org/grapher/per-capita-ghg-excl-land-use>.
+
+```{r}
+download_gg_emissions_no_land_use = FALSE
+
+if (download_gg_emissions_no_land_use){
+
+  # Fetch the data
+  df <- read.csv("https://ourworldindata.org/grapher/per-capita-ghg-excl-land-use.csv?v=1&csvType=full&useColumnShortNames=true")
+  
+  # Fetch the metadata
+  metadata <- fromJSON("https://ourworldindata.org/grapher/per-capita-ghg-excl-land-use.metadata.json?v=1&csvType=full&useColumnShortNames=true")
+  
+  # Write out csv and json file for local use
+  write.csv(df, file = 'data/per-capita-ghg-excl-land-use/per-capita-ghg-excl-land-use.csv', row.names = FALSE)
+  write_json(metadata, 'data/per-capita-ghg-excl-land-use/per-capita-ghg-excl-land-use.json')
+  rm(df, metadata)
+}
+
+
+```
+
+Read in local version.
+
+```{r}
+gg_emissions_per_person_no_land_use <- read.csv('data/per-capita-ghg-excl-land-use/per-capita-ghg-excl-land-use.csv')
+
+```
+
+
+
+### Fossil fuel use
+
+From <https://ourworldindata.org/grapher/fossil-fuel-consumption-by-fuel-type>.
+
+Units are terawatt-hours.
+
+```{r}
+download_fossil_fuel_use = FALSE
+
+if (download_fossil_fuel_use){
+
+  # Fetch the data
+  df <- read.csv("https://ourworldindata.org/grapher/fossil-fuel-consumption-by-fuel-type.csv?v=1&csvType=full&useColumnShortNames=true")
+  
+  # Fetch the metadata
+  metadata <- fromJSON("https://ourworldindata.org/grapher/fossil-fuel-consumption-by-fuel-type.metadata.json?v=1&csvType=full&useColumnShortNames=true")
+  
+  # Write out csv and json file for local use
+  write.csv(df, file = 'data/fossil-fuel-consumption-by-fuel-type/fossil-fuel-consumption-by-fuel-type.csv', row.names = FALSE)
+  write_json(metadata, 'data/fossil-fuel-consumption-by-fuel-type/fossil-fuel-consumption-by-fuel-type.json')
+ rm(df, metadata) 
+}
+
+
+```
+
+Read in local version.
+
+```{r}
+fossil_fuel_use <- read.csv('data/fossil-fuel-consumption-by-fuel-type/fossil-fuel-consumption-by-fuel-type.csv')
+
+```
+
+Add a total column.
+
+```{r}
+fossil_fuel_use$tot_fossil_fuel_consumption_twh <- fossil_fuel_use$gas_consumption_twh +
+  fossil_fuel_use$coal_consumption_twh + fossil_fuel_use$oil_consumption_twh
+```
+
+### Minerals and metals
+
+For some reason, I can't see how to use the API to download these so did them manually from the graph pages.
+
+```{r}
+cobalt_production <- read.csv('data/minerals-metals/cobalt-production.csv')
+copper_production <- read.csv('data/minerals-metals/copper-production.csv')
+lithium_production <- read.csv('data/minerals-metals/lithium-production.csv')
+nickel_production <- read.csv('data/minerals-metals/nickel-production.csv')
+steel_production <- read.csv('data/minerals-metals/steel-production.csv')
+
+```
+
+### Average surface temperature
+
+These are monthly temperatures. However, there are two columns
+of temperatures and the second is the annual mean repeated for
+each month. See <https://ourworldindata.org/grapher/average-monthly-surface-temperature>.
+
+
+
+```{r}
+download_avg_monthly_surface_temp = FALSE
+
+if (download_avg_monthly_surface_temp){
+
+  # Fetch the data
+  df <- read.csv("https://ourworldindata.org/grapher/average-monthly-surface-temperature.csv?v=1&csvType=full&useColumnShortNames=true")
+  
+  # Fetch the metadata
+  metadata <- fromJSON("https://ourworldindata.org/grapher/average-monthly-surface-temperature.metadata.json?v=1&csvType=full&useColumnShortNames=true")
+  
+  # Write out csv and json file for local use
+  write.csv(df, file = 'data/average-monthly-surface-temperature/average-monthly-surface-temperature.csv', row.names = FALSE)
+  write_json(metadata, 'data/average-monthly-surface-temperature/average-monthly-surface-temperature.json')
+  rm(df, metadata)
+}
+
+
+```
+
+```{r}
+mean_surface_temp <- read.csv('data/average-monthly-surface-temperature/average-monthly-surface-temperature.csv')
+
+names(mean_surface_temp)[6] <- 'mean_surface_temp_2m'
+
+# Get rid of all but any one month during the year
+mean_surface_temp <- mean_surface_temp %>%
+  filter(lubridate::month(Day) == 6)
+
+mean_surface_temp <- mean_surface_temp %>%
+  mutate(Year = lubridate::year(Day))
+
+mean_surface_temp <- mean_surface_temp %>% 
+  select(1, 7, 6)
+```
+
+
+### Gini coefficient
+
+Based on World Inequality Database. Gini values closer to 1 mean more inequality. See <https://ourworldindata.org/what-is-the-gini-coefficient>.
+
+```{r}
+download_gini = FALSE
+
+if (download_gini){
+
+  # Fetch the data
+  df <- read.csv("https://ourworldindata.org/grapher/economic-inequality-gini-index.csv?v=1&csvType=full&useColumnShortNames=true")
+  
+  # Fetch the metadata
+  metadata <- fromJSON("https://ourworldindata.org/grapher/economic-inequality-gini-index.metadata.json?v=1&csvType=full&useColumnShortNames=true")
+  
+  # Write out csv and json file for local use
+  write.csv(df, file = 'data/economic-inequality-gini-index/economic-inequality-gini-index.csv', row.names = FALSE)
+  write_json(metadata, 'data/economic-inequality-gini-index/economic-inequality-gini-index.json')
+  rm(df, metadata)
+}
+
+
+```
+
+Read in local version.
+
+```{r}
+gini_coefficient <- read.csv('data/economic-inequality-gini-index/economic-inequality-gini-index.csv')
+
+# drop last column
+gini_coefficient <- gini_coefficient %>% 
+  select(-ncol(gini_coefficient))
+```
+
+### Child mortality
+
+Under 5 mortality per 100 people. See <https://ourworldindata.org/grapher/child-mortality>.
+
+```{r}
+download_child_mortality = FALSE
+
+if (download_child_mortality){
+
+  # Fetch the data
+  df <- read.csv("https://ourworldindata.org/grapher/child-mortality.csv?v=1&csvType=full&useColumnShortNames=true")
+  
+  # Fetch the metadata
+  metadata <- fromJSON("https://ourworldindata.org/grapher/child-mortality.metadata.json?v=1&csvType=full&useColumnShortNames=true")
+  
+  # Write out csv and json file for local use
+  write.csv(df, file = 'data/child-mortality/child-mortality.csv', row.names = FALSE)
+  write_json(metadata, 'data/child-mortality/child-mortality.json')
+  rm(df, metadata)
+}
+
+
+```
+
+```{r}
+child_mortality <- read.csv('data/child-mortality/child-mortality.csv')
+names(child_mortality)[4] <- 'under_five_mortality'
+```
+
+### Fertility
+
+Children per woman.
+
+See <https://ourworldindata.org/grapher/children-per-woman-un>.
+
+```{r}
+download_fertility = FALSE
+
+if (download_fertility){
+
+  # Fetch the data
+  df <- read.csv("https://ourworldindata.org/grapher/children-per-woman-un.csv?v=1&csvType=full&useColumnShortNames=true")
+  
+  # Fetch the metadata
+  metadata <- fromJSON("https://ourworldindata.org/grapher/children-per-woman-un.metadata.json?v=1&csvType=full&useColumnShortNames=true")
+  
+  # Write out csv and json file for local use
+  write.csv(df, file = 'data/children-per-woman-un/children-per-woman-un.csv', row.names = FALSE)
+  write_json(metadata, 'data/children-per-woman-un/children-per-woman-un.json')
+ rm(df, metadata) 
+}
+
+
+```
+
+```{r}
+children_per_woman <- read.csv('data/children-per-woman-un/children-per-woman-un.csv')
+names(children_per_woman)[4] <- 'children_per_woman'
+```
+
+### Life expectancy
+
+At birth. See <https://ourworldindata.org/grapher/life-expectancy>.
+
+```{r}
+download_life_expectancy = FALSE
+
+if (download_life_expectancy){
+
+
+  # Fetch the data
+  df <- read.csv("https://ourworldindata.org/grapher/life-expectancy.csv?v=1&csvType=full&useColumnShortNames=true")
+  
+  # Fetch the metadata
+  metadata <- fromJSON("https://ourworldindata.org/grapher/life-expectancy.metadata.json?v=1&csvType=full&useColumnShortNames=true")
+  
+  # Write out csv and json file for local use
+  write.csv(df, file = 'data/life-expectancy/life-expectancy.csv', row.names = FALSE)
+  write_json(metadata, 'data/life-expectancy/life-expectancy.json')
+  rm(df, metadata)
+}
+
+
+```
+
+```{r}
+life_expectancy <- read.csv('data/life-expectancy/life-expectancy.csv')
+names(life_expectancy)[4] <- 'life_expectancy'
+```
+
+### Freshwater withdrawals
+
+```{r}
+download_freshwater_withdrawals = FALSE
+
+if (download_freshwater_withdrawals){
+
+  # Fetch the data
+  df <- read.csv("https://ourworldindata.org/grapher/annual-freshwater-withdrawals.csv?v=1&csvType=full&useColumnShortNames=true")
+  
+  # Fetch the metadata
+  metadata <- fromJSON("https://ourworldindata.org/grapher/annual-freshwater-withdrawals.metadata.json?v=1&csvType=full&useColumnShortNames=true")
+  
+  # Write out csv and json file for local use
+  write.csv(df, file = 'data/freshwater-withdrawals/freshwater-withdrawals.csv', row.names = FALSE)
+  write_json(metadata, 'data/freshwater-withdrawals/freshwater-withdrawalsjson')
+  rm(df, metadata)
+}
+```
+
+```{r}
+freshwater_withdrawals <- read.csv('data/freshwater-withdrawals/freshwater-withdrawals.csv')
+names(freshwater_withdrawals)[4] <- 'freshwater_withdrawals_m3'
+```
+
+
+
+## Combining data
+
+
+```{r}
+combined_df <- left_join(population, gdp_maddison, by=join_by(Entity, Year))
+
+combined_df <- left_join(combined_df, energy_per_person, by=join_by(Entity, Year))
+
+combined_df <- left_join(combined_df, gg_emissions_per_person_inc_land_use, by=join_by(Entity, Year))
+
+combined_df <- left_join(combined_df, gg_emissions_per_person_no_land_use, by=join_by(Entity, Year))
+
+combined_df <- left_join(combined_df, fossil_fuel_use, by=join_by(Entity, Year))
+
+combined_df <- left_join(combined_df, cobalt_production, by=join_by(Entity, Year))
+combined_df <- left_join(combined_df, copper_production, by=join_by(Entity, Year))
+combined_df <- left_join(combined_df, lithium_production, by=join_by(Entity, Year))
+combined_df <- left_join(combined_df, nickel_production, by=join_by(Entity, Year))
+combined_df <- left_join(combined_df, steel_production, by=join_by(Entity, Year))
+
+combined_df <- left_join(combined_df, freshwater_withdrawals, by=join_by(Entity, Year))
+
+combined_df <- left_join(combined_df, mean_surface_temp, by=join_by(Entity, Year))
+
+combined_df <- left_join(combined_df, child_mortality, by=join_by(Entity, Year))
+
+combined_df <- left_join(combined_df, children_per_woman, by=join_by(Entity, Year))
+
+combined_df <- left_join(combined_df, gini_coefficient, by=join_by(Entity, Year))
+
+combined_df <- left_join(combined_df, life_expectancy, by=join_by(Entity, Year))
+
+```
+
+We have some duplicate code columns and some renaming to deal with.
+
+We are dropping all `Code` related vars as we'll regnerate these using ISO3C codes from
+the `countrycode::countrycode()` function (along with continents and regions).
+
+```{r}
+# combined_df <- rename(combined_df, Code = Code.x)
+```
+
+```{r}
+combined_df <- combined_df %>% 
+  select(!contains('.x') & !contains('.y') & !contains('Code'))
+```
+
+
+## Filtering
+
+Each dataset has a different date range. Let's try getting rid of everything before 1980. That still gives us 40+ years for the time series.
+
+```{r}
+combined_df <- combined_df %>% 
+  filter(Year >= 1980)
+```
+
+There are a bunch of non-countries we need to get rid of.
+
+```{r}
+combined_df <- combined_df %>% 
+  filter(!grepl("\\(", Entity))
+```
+
+```{r}
+combined_df <- combined_df %>% 
+  filter(!grepl("countries", Entity))
+```
+
+```{r}
+combined_df <- combined_df %>% 
+  filter(!grepl("regions", Entity))
+```
+
+Let's create a World dataframe before we get rid of the World entries
+
+```{r}
+combined_world_df <- combined_df %>% 
+  filter(grepl("World", Entity))
+
+# Get rid of gdp_per_capita temporarily
+combined_world_df <- combined_world_df %>% 
+  select(-gdp_per_capita)
+
+# Get rid of gini as not applicable
+combined_world_df <- combined_world_df %>% 
+  select(-gini)
+
+```
+
+```{r}
+combined_df <- combined_df %>% 
+  filter(!grepl("World", Entity))
+```
+
+## Add world level metrics
+
+### GDP per capita
+
+The Maddison source for GDP has many missing values at the World level. So, populating the world dataframe from FRED for this metric.
+
+<https://fred.stlouisfed.org/series/NYGDPPCAPKDWLD>
+
+The units are 2010 dollars.
+
+```{r}
+gdp_per_capita_world <- read.csv('data/gdp-per-capita-FRED/NYGDPPCAPKDWLD.csv')
+names(gdp_per_capita_world)[2] <- 'gdp_per_capita'
+
+gdp_per_capita_world$Entity <- "World"
+gdp_per_capita_world$year <- lubridate::year(gdp_per_capita_world$observation_date)
+
+gdp_per_capita_world <- gdp_per_capita_world %>% 
+  select(Entity, year, gdp_per_capita)
+
+combined_world_df <- left_join(combined_world_df, gdp_per_capita_world, by=join_by(Entity, Year == year))
+
+```
+
+### Ocean heat
+
+See <https://ourworldindata.org/grapher/ocean-heat-top-2000m>. The units are relative to 1971 and based on a large multiple of joules.
+
+```{r}
+download_ocean_heat = FALSE
+
+if (download_ocean_heat){
+
+  # Fetch the data
+  df <- read.csv("https://ourworldindata.org/grapher/ocean-heat-top-2000m.csv?v=1&csvType=full&useColumnShortNames=true")
+  
+  # Fetch the metadata
+  metadata <- fromJSON("https://ourworldindata.org/grapher/ocean-heat-top-2000m.metadata.json?v=1&csvType=full&useColumnShortNames=true")
+  
+  # Write out csv and json file for local use
+  write.csv(df, file = 'data/ocean-heat-top-2000m/ocean-heat-top-2000m.csv', row.names = FALSE)
+  write_json(metadata, 'data/ocean-heat-top-2000m/ocean-heat-top-2000m.metadata.json')
+ 
+  rm(df, metadata) 
+}
+
+
+```
+
+
+Read the local version.
+
+
+
+```{r}
+ocean_heat <- read.csv('data/ocean-heat-top-2000m/ocean-heat-top-2000m.csv')
+
+ocean_heat <- ocean_heat %>% 
+  select(1, 3, 4, 5, 6)
+
+combined_world_df <- left_join(combined_world_df, ocean_heat, by=join_by(Entity, Year))
+```
+
+## Add total energy use and GDP columns
+
+We'll scale energy use to be in Twh
+
+annual_emissions_ghg_total_co2eq_per_capita
+annual_emissions_ghg_fossil_co2eq_per_capita
+
+```{r}
+combined_df <- combined_df %>% 
+  mutate(
+    primary_energy_consumption_Twh = primary_energy_consumption_per_capita__kwh * population / 10 ^ 9,
+    annual_emissions_ghg_total_co2eq = annual_emissions_ghg_total_co2eq_per_capita * population,
+    annual_emissions_ghg_fossil_co2eq = annual_emissions_ghg_fossil_co2eq_per_capita * population,
+    gdp_total = gdp_per_capita * population
+  )
+
+combined_world_df <- combined_world_df %>% 
+  mutate(
+    primary_energy_consumption_Twh = primary_energy_consumption_per_capita__kwh * population / 10 ^ 9,
+    annual_emissions_ghg_total_co2eq = annual_emissions_ghg_total_co2eq_per_capita * population,
+    annual_emissions_ghg_fossil_co2eq = annual_emissions_ghg_fossil_co2eq_per_capita * population,
+    gdp_total = gdp_per_capita * population 
+  )
+```
+
+## Add aggregate country codes
+
+```{r}
+combined_df$continent <- countrycode::countrycode(combined_df$Entity, origin = 'country.name', destination = 'continent')
+
+combined_df$region23 <- countrycode::countrycode(combined_df$Entity, origin = 'country.name', destination = 'region23')
+
+combined_df$iso3c <- countrycode::countrycode(combined_df$Entity, origin = 'country.name', destination = 'iso3c')
+```
+
+If no continent assigned, drop the rows.
+
+```{r}
+combined_df <- combined_df %>% 
+  filter(!is.na(continent))
+```
+
+Now rename the `Entity` column as `country`.
+
+```{r}
+names(combined_df)[1] <- 'country'
+names(combined_df)[2] <- 'year'
+names(combined_world_df)[2] <- 'year'
+```
+
+
+
+
+## Save as csv
+
+```{r}
+write.csv(combined_df, file = 'data/owid/country_metrics.csv', row.names = FALSE)
+write.csv(combined_world_df, file = 'data/owid/world_metrics.csv', row.names = FALSE)
+```
+
+
+
+
+
+

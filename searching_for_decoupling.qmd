@@ -1,0 +1,1054 @@
+---
+title: "Using R to explore and visualize decoupling"
+format:
+  html:
+    embed-resources: true
+bibliography: decoupling.bib
+---
+
+Decoupling is the notion that economic growth can continue without accompanying increases
+in energy use, greenhouse gas emissions, resource use, biodiversity loss, pollution and
+other adverse environmental and sociological impacts. This phenomena is highlighted and
+relied upon as a critical linchpin in the [green growth movement](https://www.lombardodier.com/contents/corporate-news/responsible-capital/2019/november/can-we-be-green-and-grow.html). Without decoupling, it is hard to see how economic growth can continue indefinitely on a planet with finite
+resources and a finite capacity to absorb the byproducts of perpetual growth.
+
+In this post we are going to use R to explore decoupling and hopefully learn a few
+ggplot things along the way. The data we'll use is from the well known [Our World in Data](https://ourworldindata.org/) (OWID) site which has done a great job of making well curated and carefully processed data about our world
+available for all of us. Their lead researcher is data scientist Hannah Ritchie, who recently wrote a book entitled ["Not the End of the World: How We Can Be the First Generation to Build a Sustainable Planet"](https://www.abebooks.com/servlet/BookDetailsPL?bi=31942233688&dest=usa&ref_=ps_ggl_18382194370&cm_mmc=ggl-_-US_Shopp_Trade0to10-_-product_id=COM9780316536752NEW-_-keyword=&gad_source=1&gclid=EAIaIQobChMI3vnJy7vOiwMVJDIIBR0qwzEDEAQYASABEgLRI_D_BwE) (@ritchie2024not) which features numerous visualizations based on OWID data.
+
+We'll need a few libraries.
+
+```{r}
+#| warning: false
+#| message: false
+
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+```
+
+## Creating the dataset
+
+In the decoupling conversation, GDP is generally used as the measure of economic growth - one of the things that is coupled. It is the *driving variable*. GDP is tricky to measure and not necessarily a great measure of *prosperity*. For the *driven variable*, many possibilities exist but essentially it boils down to resource use or its impact (@vaden2020decoupling). So, decoupling could occur, or not occur, for any subset of potential driven variables and might involve resource use or environmental impact. It also may be temporary or permanent. It's magnitude may be sufficient to avert some pretty bad outcomes or it may not be. Decoupling might be local, regional or global. Of course, the earth probably isn't interested in local decoupling unless the ideas underpinning it lead to global decoupling.
+
+I created two dataframes, one at the country level and one at the global level containing a range of variables that would seem to be relevant and for which data was generally available from 1980 until the near present. Data acquisition and processing scripts were written using R and can be found in the `data_prep.qmd` file in the [GitHub repository for this post](). The variables included in the global dataframe include:
+
+* `year` - four digit year,
+- `population` - see <https://ourworldindata.org/grapher/population>,
+* `gdp_per_capita` - measured in international $ pegged to year 2011 and adjusted for inflation and differences in cost of living - see <https://ourworldindata.org/grapher/gdp-per-capita-maddison-project-database>. For the global metrics file, the Maddison source for GDP has many missing values at the World level. So, we are populating the global dataframe from FRED for this metric - see <https://fred.stlouisfed.org/series/NYGDPPCAPKDWLD>. The units are 2010 dollars.
+* `primary_energy_consumption_per_capita__kwh` - see <https://ourworldindata.org/grapher/per-capita-energy-use>. Units are kilowatt-hours per person.
+* `annual_emissions_ghg_total_co2eq_per_capita` - a measure of greenhouse gas emissions per person which includes land use and forestry in addition to fossil fuel use. Greenhouse gas emissions are measured in tonnes per person of carbon dioxide-equivalents over a 100-year timescale. See <https://ourworldindata.org/grapher/total-greenhouse-gas-emissions-per-capita>.
+* `annual_emissions_ghg_fossil_co2eq_per_capita` - same as previous but emissions due to land use changes and forestry are excluded. See <https://ourworldindata.org/grapher/per-capita-ghg-excl-land-use>.
+* `*_consumption_twh` - consumption of various fossil fuels (gas, oil and coal and their total) in terawatt-hours. See <https://ourworldindata.org/grapher/fossil-fuel-consumption-by-fuel-type>.
+* `production.*.Mine.tonnes` - cobalt, copper, lithium, nickel and steel production - see <https://ourworldindata.org/metals-minerals>.
+* `freshwater_withdrawals_m3` - total water withdrawals, not counting evaporation and in cubic meters. See <https://ourworldindata.org/grapher/annual-freshwater-withdrawals>.
+* `mean_surface_temp_2m` - mean temperature of the earth in Celsius at 2m above the surface. See <https://ourworldindata.org/grapher/average-monthly-surface-temperature>.
+* `ocean_heat_content_*_2000m` - amount of heat in the top 2000m of the oceans. See <https://ourworldindata.org/grapher/ocean-heat-top-2000m>. The units are relative to 1971 and based on a large multiple of joules.
+* `under_five_mortality` - number of deaths per 100 births before the age of 5. See <https://ourworldindata.org/grapher/child-mortality>.
+* `children_per_woman` - See <https://ourworldindata.org/grapher/children-per-woman-un>.
+* `gini_coefficient` - a measure of societal inequality on a [0, 1] scale. Values closer to 1.0 mean more inequality. See <https://ourworldindata.org/what-is-the-gini-coefficient>.
+* `life_expectancy` - in years at birth. See <https://ourworldindata.org/grapher/life-expectancy>.
+
+The country level dataframe includes a `country` identifier. The following aggregate country related fields were populated using the [countrycode](https://cran.r-project.org/web/packages/countrycode/index.html) package.
+
+* `continent` - each country belongs to a continent.
+* `region23` - each country is classified as being part of one of twenty-three regions
+* `iso3c` - a unique 3 character code for each country
+
+There are a few computed fields: 
+
+* `primary_energy_consumption_Twh` - product of `population` and `primary_energy_consumption_per_capita__kwh` and rescaled to terrawatt hours.
+* `annual_emissions_ghg_total_co2eq` - product of `population` and `annual_emissions_ghg_total_co2eq_per_capita`.
+* `annual_emissions_ghg_fossil_co2eq` - product of `population` and `annual_emissions_ghg_fossil_co2eq_per_capita`.
+* `gdp_total` - product of `population` and `gdp_per_capita`.
+
+The basic data processing steps were:
+
+- download a number of different datasets using the [Our World in Data API](https://docs.owid.io/projects/etl/api/) into individual dataframes,
+- combine all the dataframes by left joining on `Entity` and `Year`,
+- use `dplyr::filter()` to only keep data from 1980 on,
+- use `dplyr::filter()` along with the `grepl()` function to get rid of rows that are not associated with countries (e.g. continents),
+- create a separate global level dataframe (filtering on `Entity == 'World'),
+- add variables to the global dataframe that aren't relevant at the country level,
+- create a few computed features,
+- added codes such as `region23` and `iso3c`,
+- exported the dataframes to CSV files.
+
+The final result is two CSV files, `country_metrics.csv` and `world_metrics.csv`. Let's read these in and take a look.
+
+```{r}
+country_metrics_df <- read.csv('data/owid/country_metrics.csv')
+world_metrics_df <- read.csv('data/owid/world_metrics.csv')
+```
+
+```{r}
+summary(world_metrics_df)
+```
+
+```{r}
+head(world_metrics_df)
+```
+
+The `country_metrics_df` dataframe has most of the same columns but is by country by year.
+
+
+## Defining decoupling is tricky
+
+Decoupling is a complex topic. I highly recommend the following report to get a concise overview of what decoupling is and analysis of whether or not or to what degree it is happening and is likely to happen in the future.
+
+- Parrique, Timothée, Jonathan Barth, François Briens, Christian Kerschner, Alejo Kraus-Polk, Anna Kuokkanen, and Joachim H Spangenberg. [“Decoupling Debunked.” Evidence and Arguments against Green Growth as a Sole Strategy for Sustainability](https://eeb.org/library/decoupling-debunked/). A Study Edited by the European Environment Bureau EEB 3 (2019).
+
+For this post, a couple of concepts are important. *Relative decoupling* is when the driven variable is growing slower than the driving variable (i.e. GDP). *Absolute decoupling* is when the driving variable is not growing even though the driving variable continues to grow. In the EEB study, it is argued that:
+
+> The validity of the green growth discourse relies on the assumption of an absolute, permanent,
+global, large and fast enough decoupling of economic growth from all critical environmental
+pressures.
+
+There's a lot to chew on there and we certainly aren't going to get into all of it in this post. Instead,
+this is just a glimpse at a handful of metrics to see if there's evidence of decoupling and if it's relative or absolute. We'll use R to do it and hopefully learn a few dplyr, tidyr, and ggplot2 tricks along the way.
+
+
+## Basic time series plots of GDP vs primary energy consumption
+
+What if we want to compare two time series such as `gdp_total` and `primary_energy_consumption_Twh`?
+The units are different so we really shouldn't plot together with two y-axes. We could facet them using a long version of the data.
+
+```{r}
+world_metrics_df |> 
+  select(year, gdp_total, primary_energy_consumption_Twh) |> 
+  pivot_longer(cols = c(gdp_total, primary_energy_consumption_Twh), names_to = 'metric', values_to = 'value') |> 
+  ggplot(aes(x = year, y = value)) +
+  geom_line() +
+  facet_grid(metric ~ ., scales = 'free_y')
+```
+The slopes look similar but that's just due to the axis limits on the graphs.
+We could also scatter them against each other. 
+
+```{r}
+world_metrics_df |> 
+  ggplot() +
+  geom_point(aes(x = gdp_total, y = primary_energy_consumption_Twh, colour = year)) 
+```
+
+Looks like GDP and PEC (primary energy consumption) are not decoupled.
+
+Another option is to index the different series to year 1. Since `world_metrics_df` is ordered by year,
+this is relatively straightforward to do for that dataframe. However, for `country_metrics_df` this will require some
+careful dplyr use. 
+
+For `world_metrics_df` we can use `mutate()` to compute the indexed series. For this first plot, I'll
+use separate `geom_line()` objects. The downside of doing plots in this way is that it's tricky to create a legend. You have to map color in `aes()` to a string representing the variable as you want it to read in the legend and then use `scale_color_manual` with a named vector of colors. See <https://forum.posit.co/t/adding-manual-legend-to-ggplot2/41651>. That is not straight forward and definitely not the "tidy" way to do it.
+
+```{r}
+colors <- c("gdp_total_idx" = "blue", "primary_energy_consumption_Twh_idx" = "black")
+
+world_metrics_df |> 
+  mutate(gdp_total_idx = gdp_total / gdp_total[1],
+         primary_energy_consumption_Twh_idx = primary_energy_consumption_Twh / primary_energy_consumption_Twh[1]) |> 
+  ggplot() +
+  geom_line(aes(x=year, y = gdp_total_idx, color = "gdp_total_idx"), linetype = 'solid') +
+  geom_line(aes(x=year, y = primary_energy_consumption_Twh_idx, 
+                color = "primary_energy_consumption_Twh_idx"), linetype = 'dashed') +
+  labs(x = "Year (1980 is year 1)", y = "Multiple of year 1", 
+       color = "Legend", title = "Primary energy consumption") +
+    scale_color_manual(values = colors)
+```
+From this plot, we can see that the two series exhibit relative decoupling. The overall rate of increase for PEC is less than that of GDP, but it's still increasing.
+
+Instead of two geoms, we could pivot to long data and filter and facet by metric. This gives us the automatic legend creation and is the tidy approach.
+
+```{r}
+#| fig-width: 8
+#| fig-height: 6
+
+world_metrics_df |> 
+  mutate(gdp_total_idx = gdp_total / gdp_total[1],
+         primary_energy_consumption_Twh_idx = primary_energy_consumption_Twh / primary_energy_consumption_Twh[1]) |> 
+  select(year, gdp_total_idx, primary_energy_consumption_Twh_idx) |> 
+  pivot_longer(cols = c(gdp_total_idx, primary_energy_consumption_Twh_idx), names_to = 'metric', values_to = 'value') |> 
+  ggplot() +
+  geom_line(aes(x=year, y = value, color = metric)) +
+  scale_color_manual(values = c("#6C5043FF", "#A3BAC2FF")) +
+  labs(x = "Year (1980 is year 1)", y = "Multiple of year 1", 
+       title = "Primary Energy Consumption")
+  
+```
+Let's take a closer look at the most recent few years.
+
+```{r}
+#| fig-width: 8
+#| fig-height: 6
+
+world_metrics_df |> 
+  filter(year >= 2020) |> 
+  mutate(gdp_total_idx = gdp_total / gdp_total[1],
+         primary_energy_consumption_Twh_idx = primary_energy_consumption_Twh / primary_energy_consumption_Twh[1]) |> 
+  select(year, gdp_total_idx, primary_energy_consumption_Twh_idx) |> 
+  pivot_longer(cols = c(gdp_total_idx, primary_energy_consumption_Twh_idx), 
+               names_to = 'metric', values_to = 'value') |> 
+  ggplot() +
+  geom_line(aes(x=year, y = value, color = metric)) +
+  scale_color_manual(values = c("#6C5043FF", "#A3BAC2FF")) +
+  labs(x = "Year (2020 is year 1)", y = "Multiple of year 1", 
+       title = "Primary Energy Consumption")
+  
+```
+
+What if we use per-capita values for these same two metrics?
+
+```{r}
+#| fig-width: 8
+#| fig-height: 6
+world_metrics_df |> 
+  mutate(gdp_per_capita_idx = gdp_per_capita / gdp_per_capita[1],
+         primary_energy_consumption_per_capita__kwh_idx = primary_energy_consumption_per_capita__kwh / primary_energy_consumption_per_capita__kwh[1]) |> 
+  select(year, gdp_per_capita_idx, primary_energy_consumption_per_capita__kwh_idx) |> 
+  pivot_longer(cols = c(gdp_per_capita_idx, primary_energy_consumption_per_capita__kwh_idx), 
+               names_to = 'metric', values_to = 'value') |> 
+  ggplot() +
+  geom_line(aes(x=year, y = value, color = metric)) +
+  scale_color_manual(values = c("#6C5043FF", "#A3BAC2FF")) +
+  labs(x = "Year (1980 is year 1)", y = "Multiple of year 1", 
+       title = "Primary Energy Consumption (per capita)")
+  
+```
+So, one sees a greater degree of relative decoupling in the per capita versions of these two metrics. From the earth's perspective, it doesn't really care about per capita statistics - it's the overall magnitude that matters.
+
+Looking at the last few years, the slopes of the two series are more similar than in the plot starting at 1980. When looking at decoupling, the date range can matter. One might get relative (or even absolute) decoupling for a period of time, only to see that revert to more coupled behavior.
+
+```{r}
+#| fig-width: 8
+#| fig-height: 6
+world_metrics_df |> 
+  filter(year >= 2020) |>
+  mutate(gdp_per_capita_idx = gdp_per_capita / gdp_per_capita[1],
+         primary_energy_consumption_per_capita__kwh_idx = primary_energy_consumption_per_capita__kwh / primary_energy_consumption_per_capita__kwh[1]) |> 
+  select(year, gdp_per_capita_idx, primary_energy_consumption_per_capita__kwh_idx) |> 
+  pivot_longer(cols = c(gdp_per_capita_idx, primary_energy_consumption_per_capita__kwh_idx), 
+               names_to = 'metric', values_to = 'value') |> 
+  ggplot() +
+  geom_line(aes(x=year, y = value, color = metric)) +
+  scale_color_manual(values = c("#6C5043FF", "#A3BAC2FF")) +
+  labs(x = "Year (2020 is year 1)", y = "Multiple of year 1",
+       title = "Primary Energy Consumption (per capita)")
+  
+```
+
+
+
+The data from OWID is per capita. I converted them to overall values by multiplying by the population value for each year.
+
+## Greenhouse gas emissions
+
+There was a high profile study done by the World Resources Institute in 2016 entitled [The Roads to Decoupling: 21 Countries Are Reducing Carbon Emissions While Growing GDP](https://www.wri.org/insights/roads-decoupling-21-countries-are-reducing-carbon-emissions-while-growing-gdp). 
+Reading the report, it would seem the analysis was production based and not consumption based - a comment is made near the end:
+
+> Beyond the aggregate trends described here, more information is needed on the potential leakage of carbon emissions to other countries as nations move their industries overseas, factors that enable sustained and absolute decoupling, and what’s needed to support larger-scale emissions mitigation.
+
+Greenhouse gas emissions are measured in tonnes per person of carbon dioxide-equivalents over a 100-year timescale. See <https://ourworldindata.org/grapher/total-greenhouse-gas-emissions-per-capita> and <https://ourworldindata.org/grapher/per-capita-ghg-excl-land-use>.
+
+
+
+The data from OWID is per capita. I converted them to overall values by multiplying by the population value for each year.
+
+Let's start by looking at the whole world and just at fossil fuel emissions.
+
+```{r}
+#| fig-width: 8
+#| fig-height: 6
+world_metrics_df |> 
+  mutate(gdp_total_idx = gdp_total / gdp_total[1],
+         annual_emissions_ghg_fossil_co2eq_idx = annual_emissions_ghg_fossil_co2eq / annual_emissions_ghg_fossil_co2eq[1]) |> 
+  select(year, gdp_total_idx, annual_emissions_ghg_fossil_co2eq_idx) |> 
+  pivot_longer(cols = c(gdp_total_idx, annual_emissions_ghg_fossil_co2eq_idx), 
+               names_to = 'metric', values_to = 'value') |> 
+  ggplot() +
+  geom_line(aes(x=year, y = value, color = metric)) +
+  scale_color_manual(values = c("#A3BAC2FF", "#6C5043FF")) +
+  labs(x = "Year (1980 is year 1)", y = "Multiple of year 1",
+       title = "Annual GHG emissions (excluding land use)")
+  
+```
+This plot reveals relative decoupling at the global level but still we have emissions increasing. That's not terribly surprising if one keeps up with the various attempts at forging international agreements for reducing greenhouse gas emissions. There have been decades of talk with not much in terms of results. Meanwhile, [the world keeps warming](https://www.nature.com/articles/s41558-025-02246-9) the [outlook isn't great for our climate](https://www.researchgate.net/profile/Cassio-Pereira-6/publication/384759743_The_2024_state_of_the_climate_report_Perilous_times_on_planet_Earth/links/670686b9cc8c9a65638fc3ef/The-2024-state-of-the-climate-report-Perilous-times-on-planet-Earth.pdf).
+
+The last few years look like this.
+
+```{r}
+#| fig-width: 8
+#| fig-height: 6
+world_metrics_df |> 
+  filter(year >= 2020) |>
+  mutate(gdp_total_idx = gdp_total / gdp_total[1],
+         annual_emissions_ghg_fossil_co2eq_idx = annual_emissions_ghg_fossil_co2eq / annual_emissions_ghg_fossil_co2eq[1]) |> 
+  select(year, gdp_total_idx, annual_emissions_ghg_fossil_co2eq_idx) |> 
+  pivot_longer(cols = c(gdp_total_idx, annual_emissions_ghg_fossil_co2eq_idx), names_to = 'metric', values_to = 'value') |> 
+  ggplot() +
+  geom_line(aes(x=year, y = value, color = metric)) +
+  scale_color_manual(values = c("#A3BAC2FF", "#6C5043FF"))+
+  labs(x = "Year (2020 is year 1)", y = "Multiple of year 1",
+       title = "Annual GHG emissions (excluding land use)")
+  
+```
+
+Now let's consider greenhouse gas emissions that also factor in land use changes and forestry.
+
+```{r}
+#| fig-width: 8
+#| fig-height: 6
+world_metrics_df |> 
+  mutate(gdp_total_idx = gdp_total / gdp_total[1],
+         annual_emissions_ghg_total_co2eq_idx = annual_emissions_ghg_total_co2eq / annual_emissions_ghg_total_co2eq[1]) |> 
+  select(year, gdp_total_idx, annual_emissions_ghg_total_co2eq_idx) |> 
+  pivot_longer(cols = c(gdp_total_idx, annual_emissions_ghg_total_co2eq_idx), 
+               names_to = 'metric', values_to = 'value') |> 
+  ggplot() +
+  geom_line(aes(x=year, y = value, color = metric)) +
+  scale_color_manual(values = c("#A3BAC2FF", "#6C5043FF")) +
+  labs(x = "Year (1980 is year 1)", y = "Multiple of year 1",
+       title = "Annual GHG emissions (including land use)")
+  
+```
+
+
+```{r}
+#| fig-width: 8
+#| fig-height: 6
+world_metrics_df |> 
+  filter(year >= 2020) |>
+  mutate(gdp_total_idx = gdp_total / gdp_total[1],
+         annual_emissions_ghg_total_co2eq_idx = annual_emissions_ghg_total_co2eq / annual_emissions_ghg_total_co2eq[1]) |> 
+  select(year, gdp_total_idx, annual_emissions_ghg_total_co2eq_idx) |> 
+  pivot_longer(cols = c(gdp_total_idx, annual_emissions_ghg_total_co2eq_idx), 
+               names_to = 'metric', values_to = 'value') |> 
+  ggplot() +
+  geom_line(aes(x=year, y = value, color = metric)) +
+  scale_color_manual(values = c("#A3BAC2FF", "#6C5043FF")) +
+  labs(x = "Year (2020 is year 1)", y = "Multiple of year 1",
+       title = "Annual GHG emissions (including land use)")
+  
+```
+Still seeing relative decoupling.
+
+What about those 21 countries in the 2016 report mentioned above?
+
+```{r}
+wri_21 <- c('Austria',
+  'Belgium',
+  'Bulgaria',
+  'Czechia',
+  'Denmark',
+  'Finland',
+  'France',
+  'Germany',
+  'Hungary',
+  'Ireland',
+  'Netherlands',
+  'Portugal',
+  'Romania',
+  'Slovakia',
+  'Spain',
+  'Sweden',
+  'Switzerland',
+  'Ukraine',
+  'United Kingdom',
+  'United States',
+  'Uzbekistan'
+  )
+```
+
+Here we need to be careful when computing the indexed values of our metrics. Notice we use a pattern that looks like this:
+
+```
+arrange(country, year) |> 
+  group_by(country, year) |> 
+  mutate(indexed_variable = value / value[1]) |> 
+  ungroup()
+```
+
+We need to do a `group_by()` so that we divide by the group level base value. Then we need to `ungroup()` to get our detailed level data back for plotting.
+
+```{r}
+#| fig-width: 20
+#| fig-height: 12
+
+country_metrics_df |> 
+  filter(country %in% wri_21, year < 2023) |> 
+  arrange(country, year) |> 
+  group_by(country) |> 
+  mutate(gdp_total_idx = gdp_total / gdp_total[1],
+       annual_emissions_ghg_total_co2eq_idx = annual_emissions_ghg_total_co2eq / annual_emissions_ghg_total_co2eq[1]) |> 
+  ungroup() |> 
+  select(year, country, gdp_total_idx, annual_emissions_ghg_total_co2eq_idx) |> 
+  pivot_longer(cols = c(gdp_total_idx, annual_emissions_ghg_total_co2eq_idx), 
+               names_to = 'metric', values_to = 'value') |> 
+  ggplot() +
+  geom_line(aes(x=year, y = value, color = metric)) + 
+  facet_wrap(~country, scales = 'free_y') +
+  scale_color_manual(values = c("#A3BAC2FF", "#6C5043FF")) +
+  labs(x = "Year (1980 is year 1)", y = "Multiple of year 1",
+       title = "Annual GHG emissions (including land use)")
+```
+
+For these 21 countries, absolute decoupling of overall greenhouse gas emissions from GDP seems to be ongoing for the most part.
+Of course, since globally we definitely do not see absolute decoupling, there must be several populous countries for which absolute decoupling is not happening. For example:
+
+```{r}
+#| fig-width: 20
+#| fig-height: 12
+
+country_metrics_df |> 
+  filter(country %in% c('China', 'India', 'Brazil', 'Mexico', 'South Africa',
+                        'Vietnam', 'Venezuela', 'Iran', 'Saudi Arabia')) |> 
+  arrange(country, year) |> 
+  group_by(country) |> 
+  mutate(gdp_total_idx = gdp_total / gdp_total[1],
+       annual_emissions_ghg_total_co2eq_idx = annual_emissions_ghg_total_co2eq / annual_emissions_ghg_total_co2eq[1]) |> 
+  ungroup() |> 
+  select(year, country, gdp_total_idx, annual_emissions_ghg_total_co2eq_idx) |> 
+  pivot_longer(cols = c(gdp_total_idx, annual_emissions_ghg_total_co2eq_idx), 
+               names_to = 'metric', values_to = 'value') |> 
+  ggplot() +
+  geom_line(aes(x=year, y = value, color = metric)) + 
+  facet_wrap(~country, scales = 'free_y') +
+  scale_color_manual(values = c("#A3BAC2FF", "#6C5043FF")) +
+  labs(x = "Year (1980 is year 1)", y = "Multiple of year 1",
+       title = "Annual GHG emissions (including land use)")
+```
+
+## Coal consumption
+
+In countries such as the US, coal plants have been closing in recent years. What does coal consumption look like on a global scale?
+
+```{r}
+#| fig-width: 8
+#| fig-height: 6
+world_metrics_df |>
+  mutate(gdp_total_idx = gdp_total / gdp_total[1],
+         coal_consumption_twh_idx = coal_consumption_twh / coal_consumption_twh[1]) |> 
+  select(year, gdp_total_idx, coal_consumption_twh_idx) |> 
+  pivot_longer(cols = c(gdp_total_idx, coal_consumption_twh_idx), 
+               names_to = 'metric', values_to = 'value') |> 
+  ggplot() +
+  geom_line(aes(x=year, y = value, color = metric)) +
+  scale_color_manual(values = c("#A3BAC2FF", "#6C5043FF")) +
+  labs(x = "Year (1980 is year 1)", y = "Multiple of year 1",
+       title = "Coal consumption")
+  
+```
+Looks like coal use is back on the rise.
+
+```{r}
+#| fig-width: 8
+#| fig-height: 6
+world_metrics_df |> 
+  filter(year >= 2020) |> 
+  mutate(gdp_total_idx = gdp_total / gdp_total[1],
+         coal_consumption_twh_idx = coal_consumption_twh / coal_consumption_twh[1]) |> 
+  select(year, gdp_total_idx, coal_consumption_twh_idx) |> 
+  pivot_longer(cols = c(gdp_total_idx, coal_consumption_twh_idx), 
+               names_to = 'metric', values_to = 'value') |> 
+  ggplot() +
+  geom_line(aes(x=year, y = value, color = metric)) +
+  scale_color_manual(values = c("#A3BAC2FF", "#6C5043FF")) +
+  labs(x = "Year (2020 is year 1)", y = "Multiple of year 1",
+       title = "Coal consumption")
+  
+```
+
+What about gas and oil?
+
+
+```{r}
+#| fig-width: 8
+#| fig-height: 6
+world_metrics_df |> 
+  mutate(gdp_total_idx = gdp_total / gdp_total[1],
+         oil_consumption_twh_idx = oil_consumption_twh / oil_consumption_twh[1]) |> 
+  select(year, gdp_total_idx, oil_consumption_twh_idx) |> 
+  pivot_longer(cols = c(gdp_total_idx, oil_consumption_twh_idx), 
+               names_to = 'metric', values_to = 'value') |> 
+  ggplot() +
+  geom_line(aes(x=year, y = value, color = metric)) +
+  scale_color_manual(values = c("#6C5043FF", "#A3BAC2FF")) +
+  labs(x = "Year (1980 is year 1)", y = "Multiple of year 1",
+       title = "Oil consumption")
+  
+```
+```{r}
+#| fig-width: 8
+#| fig-height: 6
+world_metrics_df |> 
+  filter(year >= 2020) |> 
+  mutate(gdp_total_idx = gdp_total / gdp_total[1],
+         oil_consumption_twh_idx = oil_consumption_twh / oil_consumption_twh[1]) |> 
+  select(year, gdp_total_idx, oil_consumption_twh_idx) |> 
+  pivot_longer(cols = c(gdp_total_idx, oil_consumption_twh_idx), 
+               names_to = 'metric', values_to = 'value') |> 
+  ggplot() +
+  geom_line(aes(x=year, y = value, color = metric)) +
+  scale_color_manual(values = c("#6C5043FF", "#A3BAC2FF")) +
+  labs(x = "Year (2020 is year 1)", y = "Multiple of year 1",
+       title = "Oil consumption")
+  
+```
+
+```{r}
+#| fig-width: 8
+#| fig-height: 6
+world_metrics_df |> 
+  mutate(gdp_total_idx = gdp_total / gdp_total[1],
+         gas_consumption_twh_idx = gas_consumption_twh / gas_consumption_twh[1]) |> 
+  select(year, gdp_total_idx, gas_consumption_twh_idx) |> 
+  pivot_longer(cols = c(gdp_total_idx, gas_consumption_twh_idx), 
+               names_to = 'metric', values_to = 'value') |> 
+  ggplot() +
+  geom_line(aes(x=year, y = value, color = metric)) +
+  scale_color_manual(values = c("#A3BAC2FF", "#6C5043FF")) +
+  labs(x = "Year (1980 is year 1)", y = "Multiple of year 1",
+       title = "Gas consumption")
+  
+```
+
+```{r}
+#| fig-width: 8
+#| fig-height: 6
+world_metrics_df |> 
+  filter(year >= 2020) |> 
+  mutate(gdp_total_idx = gdp_total / gdp_total[1],
+         gas_consumption_twh_idx = gas_consumption_twh / gas_consumption_twh[1]) |> 
+  select(year, gdp_total_idx, gas_consumption_twh_idx) |> 
+  pivot_longer(cols = c(gdp_total_idx, gas_consumption_twh_idx), 
+               names_to = 'metric', values_to = 'value') |> 
+  ggplot() +
+  geom_line(aes(x=year, y = value, color = metric)) +
+  scale_color_manual(values = c("#A3BAC2FF", "#6C5043FF")) +
+  labs(x = "Year (2020 is year 1)", y = "Multiple of year 1",
+       title = "Gas consumption")
+  
+```
+
+```{r}
+#| fig-width: 8
+#| fig-height: 6
+world_metrics_df |> 
+  mutate(gdp_total_idx = gdp_total / gdp_total[1],
+         tot_fossil_fuel_consumption_idx = tot_fossil_fuel_consumption_twh / tot_fossil_fuel_consumption_twh[1]) |> 
+  select(year, gdp_total_idx, tot_fossil_fuel_consumption_idx) |> 
+  pivot_longer(cols = c(gdp_total_idx, tot_fossil_fuel_consumption_idx), 
+               names_to = 'metric', values_to = 'value') |> 
+  ggplot() +
+  geom_line(aes(x=year, y = value, color = metric)) +
+  scale_color_manual(values = c("#6C5043FF", "#A3BAC2FF")) +
+  labs(x = "Year (1980 is year 1)", y = "Multiple of year 1",
+       title = "Total fossil fuel consumption")
+  
+```
+
+```{r}
+#| fig-width: 8
+#| fig-height: 6
+world_metrics_df |> 
+  filter(year >= 2020) |> 
+  mutate(gdp_total_idx = gdp_total / gdp_total[1],
+         tot_fossil_fuel_consumption_idx = tot_fossil_fuel_consumption_twh / tot_fossil_fuel_consumption_twh[1]) |> 
+  select(year, gdp_total_idx, tot_fossil_fuel_consumption_idx) |> 
+  pivot_longer(cols = c(gdp_total_idx, tot_fossil_fuel_consumption_idx), 
+               names_to = 'metric', values_to = 'value') |> 
+  ggplot() +
+  geom_line(aes(x=year, y = value, color = metric)) +
+  scale_color_manual(values = c("#6C5043FF", "#A3BAC2FF")) +
+  labs(x = "Year (2020 is year 1)", y = "Multiple of year 1",
+       title = "otal fossil fuel consumption")
+  
+```
+
+Safe to say there's no absolute decoupling of fossil fuel use and GDP.
+
+## Minerals and metal production
+
+We will look at cobalt, copper, lithium, nickel and steel production.
+
+```{r}
+#| fig-width: 8
+#| fig-height: 6
+world_metrics_df |> 
+  mutate(gdp_total_idx = gdp_total / gdp_total[1],
+         production.Steel.Processing..crude.tonnes_idx = production.Steel.Processing..crude.tonnes / production.Steel.Processing..crude.tonnes[1]) |> 
+  select(year, gdp_total_idx, production.Steel.Processing..crude.tonnes_idx) |> 
+  pivot_longer(cols = c(gdp_total_idx, production.Steel.Processing..crude.tonnes_idx), 
+               names_to = 'metric', values_to = 'value') |> 
+  ggplot() +
+  geom_line(aes(x=year, y = value, color = metric)) +
+  scale_color_manual(values = c("#6C5043FF", "#A3BAC2FF")) +
+  labs(x = "Year (1980 is year 1)", y = "Multiple of year 1",
+       title = "Steel production")
+  
+```
+
+Let's look at the sum of cobalt, copper, lithium and nickel production.
+
+
+```{r}
+#| fig-width: 8
+#| fig-height: 6
+world_metrics_df |> 
+  mutate(CCLN_production = rowSums(cbind(production.Cobalt.Mine.tonnes,
+           production.Copper.Mine.tonnes,
+           production.Lithium.Mine.tonnes,
+           production.Nickel.Mine.tonnes), na.rm = T)) |> 
+  mutate(gdp_total_idx = gdp_total / gdp_total[1],
+         CCLN_production_idx = CCLN_production / CCLN_production[1]) |> 
+  select(year, gdp_total_idx, CCLN_production_idx) |> 
+  pivot_longer(cols = c(gdp_total_idx, CCLN_production_idx), 
+               names_to = 'metric', values_to = 'value') |> 
+  ggplot() +
+  geom_line(aes(x=year, y = value, color = metric)) +
+  scale_color_manual(values = c("#A3BAC2FF", "#6C5043FF")) +
+  labs(x = "Year (1980 is year 1)", y = "Multiple of year 1", 
+       title = "Total cobalt, copper, lithium, and nickel production")
+  
+```
+No decoupling here.
+
+## Water
+
+Water consumption is another important resource use to consider. Data availability only lets us look at 2014-2021.
+
+```{r}
+#| fig-width: 8
+#| fig-height: 6
+world_metrics_df |> 
+  filter(between(year, 2014, 2021)) |> 
+  mutate(gdp_total_idx = gdp_total / gdp_total[1],
+         freshwater_withdrawals_m3_idx = freshwater_withdrawals_m3 / freshwater_withdrawals_m3[1]) |> 
+  select(year, gdp_total_idx, freshwater_withdrawals_m3_idx) |> 
+  pivot_longer(cols = c(gdp_total_idx, freshwater_withdrawals_m3_idx), names_to = 'metric', values_to = 'value') |> 
+  ggplot() +
+  geom_line(aes(x=year, y = value, color = metric)) +
+  scale_color_manual(values = c("#A3BAC2FF", "#6C5043FF")) +
+  labs(x = "Year (2014 is year 1)", y = "Multiple of year 1", 
+       title = "Freshwater withdrawals")
+  
+```
+
+This will be one to watch as temperatures rise and the boom in data center construction continues to meet the energy needs of the recent advances in AI models. Data centers needs plenty of water for cooling.
+
+## US, Canada, Mexico
+
+Let's look at these three countries in comparison to each other and as a group.
+
+```{r}
+#| fig-width: 8
+#| fig-height: 6
+north_america_metrics_df <- country_metrics_df |> 
+  filter(country == 'United States' | country == 'Canada' | country == 'Mexico') |> 
+  group_by(year) |> 
+  summarise(
+    tot_fossil_fuel_consumption_twh = sum(tot_fossil_fuel_consumption_twh),
+    primary_energy_consumption_Twh = sum(primary_energy_consumption_Twh),
+    annual_emissions_ghg_total_co2eq = sum(annual_emissions_ghg_total_co2eq),
+    gdp_total = sum(gdp_total)
+  )
+```
+
+### Primary energy consumption in US, CA, MX
+
+```{r}
+#| fig-width: 8
+#| fig-height: 6
+north_america_metrics_df |> 
+  mutate(gdp_total_idx = gdp_total / gdp_total[1],
+         primary_energy_consumption_Twh_idx = primary_energy_consumption_Twh / primary_energy_consumption_Twh[1]) |> 
+  select(year, gdp_total_idx, primary_energy_consumption_Twh_idx) |> 
+  pivot_longer(cols = c(gdp_total_idx, primary_energy_consumption_Twh_idx), names_to = 'metric', values_to = 'value') |> 
+  ggplot() +
+  geom_line(aes(x=year, y = value, color = metric)) +
+  scale_color_manual(values = c("#6C5043FF", "#A3BAC2FF")) +
+  labs(x = "Year (1980 is year 1)", y = "Multiple of year 1", 
+       title = "Primary energy consumption - US, CA, MX")
+  
+```
+```{r}
+#| fig-width: 8
+#| fig-height: 6
+country_metrics_df |> 
+  filter(country == 'United States' | country == 'Canada' | country == 'Mexico') |> 
+  group_by(country) |> 
+  mutate(gdp_total_idx = gdp_total / gdp_total[1],
+       primary_energy_consumption_Twh_idx = primary_energy_consumption_Twh / primary_energy_consumption_Twh[1]) |> 
+  ungroup() |> 
+  select(country, year, gdp_total_idx, primary_energy_consumption_Twh_idx) |> 
+  pivot_longer(cols = c(gdp_total_idx, primary_energy_consumption_Twh_idx), names_to = 'metric', values_to = 'value') |> 
+  ggplot() +
+  geom_line(aes(x=year, y = value, color = metric)) + 
+  facet_grid(country ~ ., scales = 'free_y') +
+  scale_color_manual(values = c("#6C5043FF", "#A3BAC2FF")) +
+  labs(x = "Year (1980 is year 1)", y = "Multiple of year 1", 
+       title = "Primary energy consumption - US, CA, MX")
+  
+```
+### Total fossil fuel consumption in US, CA, MX
+
+```{r}
+#| fig-width: 8
+#| fig-height: 6
+#| warning: false
+north_america_metrics_df |> 
+  mutate(gdp_total_idx = gdp_total / gdp_total[1],
+       tot_fossil_fuel_consumption_twh_idx = tot_fossil_fuel_consumption_twh / tot_fossil_fuel_consumption_twh[1]) |> 
+  select(year, gdp_total_idx, tot_fossil_fuel_consumption_twh_idx) |> 
+  pivot_longer(cols = c(gdp_total_idx, tot_fossil_fuel_consumption_twh_idx), names_to = 'metric', values_to = 'value') |> 
+  ggplot() +
+  geom_line(aes(x=year, y = value, color = metric)) +
+  scale_color_manual(values = c("#6C5043FF", "#A3BAC2FF")) +
+  labs(x = "Year (1980 is year 1)", y = "Multiple of year 1", 
+       title = "Total fossil fuel consumption - US, CA, MX")
+  
+```
+
+```{r}
+#| fig-width: 8
+#| fig-height: 6
+#| warning: false
+country_metrics_df |> 
+  filter(country == 'United States' | country == 'Canada' | country == 'Mexico') |> 
+  group_by(country) |> 
+  mutate(gdp_total_idx = gdp_total / gdp_total[1],
+       tot_fossil_fuel_consumption_twh_idx = tot_fossil_fuel_consumption_twh / tot_fossil_fuel_consumption_twh[1]) |> 
+  ungroup() |> 
+  select(country, year, gdp_total_idx, tot_fossil_fuel_consumption_twh_idx) |> 
+  pivot_longer(cols = c(gdp_total_idx, tot_fossil_fuel_consumption_twh_idx), names_to = 'metric', values_to = 'value') |> 
+  ggplot() +
+  geom_line(aes(x=year, y = value, color = metric)) + 
+  facet_grid(country ~ ., scales = 'free_y') +
+  scale_color_manual(values = c("#6C5043FF", "#A3BAC2FF")) +
+  labs(x = "Year (1980 is year 1)", y = "Multiple of year 1", 
+       title = "Total fossil fuel consumption - US, CA, MX")
+  
+```
+
+### Total greenhouse gas emissions in US, CA, MX
+
+```{r}
+#| fig-width: 8
+#| fig-height: 6
+#| warning: false
+north_america_metrics_df |> 
+  mutate(gdp_total_idx = gdp_total / gdp_total[1],
+       annual_emissions_ghg_total_co2eq_idx = annual_emissions_ghg_total_co2eq / annual_emissions_ghg_total_co2eq[1]) |> 
+  select(year, gdp_total_idx, annual_emissions_ghg_total_co2eq_idx) |> 
+  pivot_longer(cols = c(gdp_total_idx, annual_emissions_ghg_total_co2eq_idx), names_to = 'metric', values_to = 'value') |> 
+  ggplot() +
+  geom_line(aes(x=year, y = value, color = metric)) +
+  scale_color_manual(values = c("#A3BAC2FF", "#6C5043FF")) +
+  labs(x = "Year (1980 is year 1)", y = "Multiple of year 1", 
+       title = "Total greenhouse gas emissions - US, CA, MX")
+  
+```
+This looks promising.
+
+```{r}
+#| fig-width: 8
+#| fig-height: 6
+#| warning: false
+country_metrics_df |> 
+  filter(country == 'United States' | country == 'Canada' | country == 'Mexico') |> 
+  group_by(country) |> 
+  mutate(gdp_total_idx = gdp_total / gdp_total[1],
+       annual_emissions_ghg_total_co2eq_idx = annual_emissions_ghg_total_co2eq / annual_emissions_ghg_total_co2eq[1]) |> 
+  ungroup() |> 
+  select(country, year, gdp_total_idx, annual_emissions_ghg_total_co2eq_idx) |> 
+  pivot_longer(cols = c(gdp_total_idx, annual_emissions_ghg_total_co2eq_idx), names_to = 'metric', values_to = 'value') |> 
+  ggplot() +
+  geom_line(aes(x=year, y = value, color = metric)) + facet_grid(country ~ ., scales = 'free_y') +
+  scale_color_manual(values = c("#A3BAC2FF", "#6C5043FF")) +
+  labs(x = "Year (1980 is year 1)", y = "Multiple of year 1", 
+       title = "Total greenhouse gas emissions - US, CA, MX")
+  
+```
+Recent increases in wind and solar likely the cause of the stabilization of GHG emissions in US and Canada. Mexico is still seeing increases.
+
+
+What about coal production in these three countries?
+
+
+```{r}
+#| fig-width: 8
+#| fig-height: 6
+#| warning: false
+country_metrics_df |> 
+  filter(country == 'United States' | country == 'Canada' | country == 'Mexico') |> 
+  group_by(country) |> 
+  mutate(gdp_total_idx = gdp_total / gdp_total[1],
+       coal_consumption_twh_idx = coal_consumption_twh / coal_consumption_twh[1]) |> 
+  ungroup() |> 
+  select(country, year, gdp_total_idx, coal_consumption_twh_idx) |> 
+  pivot_longer(cols = c(gdp_total_idx, coal_consumption_twh_idx), names_to = 'metric', values_to = 'value') |> 
+  ggplot() +
+  geom_line(aes(x=year, y = value, color = metric)) + facet_grid(country ~ ., scales = 'free_y') +
+  scale_color_manual(values = c("#A3BAC2FF", "#6C5043FF")) +
+  labs(x = "Year (1980 is year 1)", y = "Multiple of year 1", 
+       title = "Coal production - US, CA, MX")
+  
+```
+
+
+## Regional summaries
+
+**NOTE** Missing data series in some of the following plots are due to lack of data in the index year of 1980.
+
+```{r}
+#| fig-width: 20
+#| fig-height: 12
+#| warning: false
+
+country_metrics_df |> 
+  filter(year <= 2022) |> 
+  group_by(year, region23) |> 
+  summarise(
+    tot_fossil_fuel_consumption_twh = sum(tot_fossil_fuel_consumption_twh, na.rm = TRUE),
+    primary_energy_consumption_Twh = sum(primary_energy_consumption_Twh, na.rm = TRUE),
+    annual_emissions_ghg_total_co2eq = sum(annual_emissions_ghg_total_co2eq, na.rm = TRUE),
+    gdp_total = sum(gdp_total, na.rm = TRUE)
+  ) |> 
+  arrange(region23, year) |> 
+  group_by(region23) |> 
+  mutate(gdp_total_idx = gdp_total / gdp_total[1],
+       primary_energy_consumption_Twh_idx = primary_energy_consumption_Twh / primary_energy_consumption_Twh[1]) |> 
+  ungroup() |> 
+  select(year, region23, gdp_total_idx, primary_energy_consumption_Twh_idx) |> 
+  pivot_longer(cols = c(gdp_total_idx, primary_energy_consumption_Twh_idx), names_to = 'metric', values_to = 'value') |> 
+  ggplot() +
+  geom_line(aes(x=year, y = value, color = metric)) + 
+  facet_wrap(~region23, scales = 'free_y') +
+  scale_color_manual(values = c("#6C5043FF", "#A3BAC2FF")) +
+  labs(x = "Year (1980 is year 1)", y = "Multiple of year 1", 
+       title = "Primary energy consumption")
+```
+
+```{r}
+#| fig-width: 20
+#| fig-height: 12
+#| warning: false
+
+country_metrics_df |> 
+  filter(year <= 2022) |> 
+  group_by(year, region23) |> 
+  summarise(
+    tot_fossil_fuel_consumption_twh = sum(tot_fossil_fuel_consumption_twh, na.rm = TRUE),
+    primary_energy_consumption_Twh = sum(primary_energy_consumption_Twh, na.rm = TRUE),
+    annual_emissions_ghg_total_co2eq = sum(annual_emissions_ghg_total_co2eq, na.rm = TRUE),
+    gdp_total = sum(gdp_total, na.rm = TRUE)
+  ) |> 
+  arrange(region23, year) |> 
+  group_by(region23) |> 
+  mutate(gdp_total_idx = gdp_total / gdp_total[1],
+       annual_emissions_ghg_total_co2eq_idx = annual_emissions_ghg_total_co2eq / annual_emissions_ghg_total_co2eq[1]) |> 
+  ungroup() |> 
+  select(year, region23, gdp_total_idx, annual_emissions_ghg_total_co2eq_idx) |> 
+  pivot_longer(cols = c(gdp_total_idx, annual_emissions_ghg_total_co2eq_idx), names_to = 'metric', values_to = 'value') |> 
+  ggplot() +
+  geom_line(aes(x=year, y = value, color = metric)) + facet_wrap(~region23, scales = 'free_y') +
+  scale_color_manual(values = c("#A3BAC2FF", "#6C5043FF")) +
+  labs(x = "Year (1980 is year 1)", y = "Multiple of year 1", 
+       title = "Total greenhouse gas emissions")
+```
+
+## Population
+
+Population marches steadily on.
+
+```{r}
+#| fig-width: 8
+#| fig-height: 6
+world_metrics_df |> 
+  mutate(gdp_total_idx = gdp_total / gdp_total[1],
+         population_idx = population / population[1]) |> 
+  select(year, gdp_total_idx, population_idx) |> 
+  pivot_longer(cols = c(gdp_total_idx, population_idx), names_to = 'metric', values_to = 'value') |> 
+  ggplot() +
+  geom_line(aes(x=year, y = value, color = metric)) + 
+  scale_color_manual(values = c("#6C5043FF", "#A3BAC2FF")) +
+  labs(x = "Year (1980 is year 1)", y = "Multiple of year 1", 
+       title = "Population")
+  
+```
+
+```{r}
+#| fig-width: 8
+#| fig-height: 6
+world_metrics_df |> 
+  filter(year >= 2020) |>
+  mutate(gdp_total_idx = gdp_total / gdp_total[1],
+         population_idx = population / population[1]) |> 
+  select(year, gdp_total_idx, population_idx) |> 
+  pivot_longer(cols = c(gdp_total_idx, population_idx), names_to = 'metric', values_to = 'value') |> 
+  ggplot() +
+  geom_line(aes(x=year, y = value, color = metric)) + 
+  scale_color_manual(values = c("#6C5043FF", "#A3BAC2FF")) +
+  labs(x = "Year (2020 is year 1)", y = "Multiple of year 1", 
+       title = "Population")
+  
+```
+
+```{r}
+#| fig-width: 20
+#| fig-height: 12
+#| warning: false
+
+country_metrics_df |> 
+  filter(between(year, 1990, 2022)) |> 
+  group_by(year, region23) |> 
+  summarise(
+    population = sum(population, na.rm = TRUE),
+    gdp_total = sum(gdp_total, na.rm = TRUE)
+  ) |> 
+  arrange(region23, year) |> 
+  group_by(region23) |> 
+  mutate(gdp_total_idx = gdp_total / gdp_total[1],
+       population_idx = population / population[1]) |> 
+  ungroup() |> 
+  select(year, region23, gdp_total_idx, population_idx) |> 
+  pivot_longer(cols = c(gdp_total_idx, population_idx), names_to = 'metric', values_to = 'value') |> 
+  ggplot() +
+  geom_line(aes(x=year, y = value, color = metric)) + facet_wrap(~region23, scales = 'free_y') +
+  scale_color_manual(values = c("#6C5043FF", "#A3BAC2FF")) +
+  labs(x = "Year (1990 is year 1)", y = "Multiple of year 1", title = "Population")
+```
+
+## Temperature increases
+
+I thought it might be interesting to look at temperature increases both over land as well as in the oceans.
+
+```{r}
+#| fig-width: 8
+#| fig-height: 6
+#| warning: false
+world_metrics_df |> 
+  mutate(gdp_total_idx = gdp_total / gdp_total[1],
+         mean_surface_temp_2m_idx = mean_surface_temp_2m / mean_surface_temp_2m[1]) |> 
+  select(year, gdp_total_idx, mean_surface_temp_2m_idx) |> 
+  pivot_longer(cols = c(gdp_total_idx, mean_surface_temp_2m_idx), names_to = 'metric', values_to = 'value') |> 
+  ggplot() +
+  geom_line(aes(x=year, y = value, color = metric)) +
+  scale_color_manual(values = c("#6C5043FF", "#A3BAC2FF")) +
+  labs(x = "Year (1980 is year 1)", y = "Multiple of year 1", 
+       title = "Mean surface temperature at 2m")
+  
+```
+
+```{r}
+#| fig-width: 8
+#| fig-height: 6
+world_metrics_df |> 
+  filter(year >= 2020) |>
+  mutate(gdp_total_idx = gdp_total / gdp_total[1],
+         mean_surface_temp_2m_idx = mean_surface_temp_2m / mean_surface_temp_2m[1]) |> 
+  select(year, gdp_total_idx, mean_surface_temp_2m_idx) |> 
+  pivot_longer(cols = c(gdp_total_idx, mean_surface_temp_2m_idx), names_to = 'metric', values_to = 'value') |> 
+  ggplot() +
+  geom_line(aes(x=year, y = value, color = metric)) +
+  scale_color_manual(values = c("#6C5043FF", "#A3BAC2FF")) +
+  labs(x = "Year (1980 is year 1)", y = "Multiple of year 1", 
+       title = "Mean surface temperature at 2m")
+  
+```
+
+For the ocean heat content data, it requires some careful reindexing since the original data was indexed to
+1971 - see <https://ourworldindata.org/grapher/ocean-heat-top-2000m>. This leads to negative values for some
+of the data near 1980. We can simply shift the data by adding a constant and then reindex to 1980.
+
+
+```{r}
+#| fig-width: 8
+#| fig-height: 6
+#| warning: false
+
+shift_constant <- world_metrics_df |> 
+  select(ocean_heat_content_noaa_2000m) |> 
+  filter(ocean_heat_content_noaa_2000m < 0) |> 
+  min() |> 
+  abs() + 5
+
+
+world_metrics_df |> 
+  mutate(gdp_total_idx = gdp_total / gdp_total[1],
+         ocean_heat_content_noaa_2000m_idx = (ocean_heat_content_noaa_2000m + shift_constant) / (ocean_heat_content_noaa_2000m[1] + shift_constant)) |> 
+  select(year, gdp_total_idx, ocean_heat_content_noaa_2000m_idx) |> 
+  pivot_longer(cols = c(gdp_total_idx, ocean_heat_content_noaa_2000m_idx), names_to = 'metric', values_to = 'value') |> 
+  ggplot() +
+  geom_line(aes(x=year, y = value, color = metric)) +
+  scale_color_manual(values = c("#6C5043FF", "#A3BAC2FF")) +
+  labs(x = "Year (1980 is year 1)", y = "Multiple of year 1", 
+       title = "Ocean heat content in top 2000m")
+  
+```
+Ruh roh. That looks troubling.
+
+**OWID citation**
+
+> EPA based on various sources (2021) – with minor processing by Our World in Data. “IAP” [dataset]. United States Environmental Protection Agency, “Climate Change Indicators: Ocean Heat” [original data].
+
+## Life expectancy
+
+Obviously we have an unprecedented in recent times pandemic affecting this metric.
+
+```{r}
+#| fig-width: 8
+#| fig-height: 6
+#| warning: false
+world_metrics_df |> 
+  mutate(gdp_total_idx = gdp_total / gdp_total[1],
+         life_expectancy_idx = life_expectancy / life_expectancy[1]) |> 
+  select(year, gdp_total_idx, life_expectancy_idx) |> 
+  pivot_longer(cols = c(gdp_total_idx, life_expectancy_idx), names_to = 'metric', values_to = 'value') |> 
+  ggplot() +
+  geom_line(aes(x=year, y = value, color = metric)) +
+  scale_color_manual(values = c("#6C5043FF", "#A3BAC2FF")) +
+  labs(x = "Year (1980 is year 1)", y = "Multiple of year 1", title = "Life expectancy")
+  
+```
+
+Let's sandwich the pandemic.
+
+```{r}
+#| fig-width: 8
+#| fig-height: 6
+#| warning: false
+world_metrics_df |> 
+  filter(year >= 2015) |>
+  mutate(gdp_total_idx = gdp_total / gdp_total[1],
+         life_expectancy_idx = life_expectancy / life_expectancy[1]) |> 
+  select(year, gdp_total_idx, life_expectancy_idx) |> 
+  pivot_longer(cols = c(gdp_total_idx, life_expectancy_idx), names_to = 'metric', values_to = 'value') |> 
+  ggplot() +
+  geom_line(aes(x=year, y = value, color = metric)) +
+  scale_color_manual(values = c("#6C5043FF", "#A3BAC2FF")) +
+  labs(x = "Year (2015 is year 1)", y = "Multiple of year 1", title = "Life expectancy")
+  
+```
+
+## Parting words
+
+From p3 of the 2019 EEB study:
+
+> The fact that decoupling on its own, i.e. without addressing the issue of economic growth, has not been and will not be sufficient to reduce environmental pressures to the required extent is not a reason to oppose decoupling (in the literal sense of separating the environmental pressures curve from the GDP curve) or the measures that achieve decoupling - on the contrary, without many such measures the situation would be far worse. It is a reason to have major concerns about the predominant focus of policymakers on green growth, this focus being based on the flawed assumption that sufficient decoupling can be achieved through increased efficiency without limiting economic production and consumption.
+
+## Data source citations
+
+Here are the citations from the various OWID data sources used as part of this post.
+
+* HYDE (2023); Gapminder (2022); UN WPP (2024) – with major processing by Our World in Data. “Population” [dataset]. PBL Netherlands Environmental Assessment Agency, “History Database of the Global Environment 3.3”; Gapminder, “Population v7”; United Nations, “World Population Prospects”; Gapminder, “Systema Globalis” [original data]. Retrieved February 13, 2025 from https://ourworldindata.org/grapher/population
+* Bolt and van Zanden - Maddison Project Database 2023 – with minor processing by Our World in Data. “GDP per capita – Maddison Project Database – In constant international-$. Historical data” [dataset]. Bolt and van Zanden, “Maddison Project Database 2023” [original data]. Retrieved February 13, 2025 from https://ourworldindata.org/grapher/gdp-per-capita-maddison-project-database
+* U.S. Energy Information Administration (2023); Energy Institute - Statistical Review of World Energy (2024); Population based on various sources (2023) – with major processing by Our World in Data. “Primary energy consumption per capita” [dataset]. U.S. Energy Information Administration, “International Energy Data”; Energy Institute, “Statistical Review of World Energy”; Various sources, “Population” [original data]. Retrieved February 17, 2025 from https://ourworldindata.org/grapher/per-capita-energy-use
+* Jones et al. (2024); Population based on various sources (2024) – with major processing by Our World in Data. “Per capita greenhouse gas emissions including land use” [dataset]. Jones et al., “National contributions to climate change 2024.2”; Various sources, “Population” [original data]. Retrieved February 17, 2025 from https://ourworldindata.org/grapher/total-greenhouse-gas-emissions-per-capita
+* Jones et al. (2024); Population based on various sources (2024) – with major processing by Our World in Data. “Per capita greenhouse gas emissions from fossil fuels and industry” [dataset]. Jones et al., “National contributions to climate change 2024.2”; Various sources, “Population” [original data]. Retrieved February 13, 2025 from https://ourworldindata.org/grapher/per-capita-ghg-excl-land-use
+* Energy Institute - Statistical Review of World Energy (2024) – with major processing by Our World in Data. “Coal consumption” [dataset]. Energy Institute, “Statistical Review of World Energy” [original data].
+* USGS - Mineral Commodity Summaries (2024); USGS - Historical Statistics for Mineral and Material Commodities (2023); BGS - World Mineral Statistics (2023) – with major processing by Our World in Data. “Copper production” [dataset]. United States Geological Survey, “Mineral Commodity Summaries”; United States Geological Survey, “Historical Statistics for Mineral and Material Commodities”; British Geological Survey, “World Mineral Statistics” [original data].
+* Food and Agriculture Organization of the United Nations (via World Bank) (2025) – processed by Our World in Data. “Annual freshwater withdrawals” [dataset]. Food and Agriculture Organization of the United Nations (via World Bank), “World Development Indicators” [original data]. Retrieved February 13, 2025 from https://ourworldindata.org/grapher/annual-freshwater-withdrawals
+* Contains modified Copernicus Climate Change Service information (2025) – with major processing by Our World in Data. “Annual average” [dataset]. Contains modified Copernicus Climate Change Service information, “ERA5 monthly averaged data on single levels from 1940 to present 2” [original data].
+* Gapminder (2020); UN Inter-agency Group for Child Mortality Estimation (2024) – with major processing by Our World in Data. “Under-five mortality rate – UN IGME; Gapminder – Long-run data” [dataset]. United Nations Inter-agency Group for Child Mortality Estimation, “United Nations Inter-agency Group for Child Mortality Estimation”; Gapminder, “Child mortality rate under age five v7”; Various sources, “Population” [original data]. Retrieved February 20, 2025 from https://ourworldindata.org/grapher/child-mortality
+* UN, World Population Prospects (2024) – processed by Our World in Data. “Fertility rate, total – UN WPP” [dataset]. United Nations, “World Population Prospects” [original data]. Retrieved February 20, 2025 from https://ourworldindata.org/grapher/children-per-woman-un
+* World Bank Poverty and Inequality Platform (2024) – with major processing by Our World in Data. “Gini Coefficient – World Bank” [dataset]. World Bank Poverty and Inequality Platform, “World Bank Poverty and Inequality Platform (PIP) 20240627_2017, 20240627_2011” [original data].
+* UN WPP (2024); HMD (2024); Zijdeman et al. (2015); Riley (2005) – with minor processing by Our World in Data. “Life expectancy at birth – Various sources – period tables” [dataset]. Human Mortality Database, “Human Mortality Database”; United Nations, “World Population Prospects”; Zijdeman et al., “Life Expectancy at birth 2”; James C. Riley, “Estimates of Regional and Global Life Expectancy, 1800-2001” [original data]. Retrieved February 20, 2025 from https://ourworldindata.org/grapher/life-expectancy
+* U.S. Bureau of Economic Analysis via FRED®
